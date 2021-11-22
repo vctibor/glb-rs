@@ -3,5 +3,12 @@ name = "glb-rs"
 version = "0.1.0"
 edition = "2018"
 
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
+[lib]
+name = "glb_rs"
+path = "src/lib/mod.rs"
 
 [dependencies]
