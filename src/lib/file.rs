@@ -120,9 +120,7 @@ impl UntypedFile {
         let height = as_u32_le(&self.bytes[offset..offset+4]) as usize;
         offset = offset + 4;
 
-        
         let data = self.bytes[23..].to_vec();
-        
         
         if i_line_count == 0 {
             let mut pixels: Vec<ArgbPixel> = Vec::with_capacity(data.len() / 2);
@@ -141,8 +139,38 @@ impl UntypedFile {
         16 | BYTE[iCount] | bPixels		    pixels to write
         */
 
-        // TODO
+        let mut pixels: Vec<ArgbPixel> = vec![ArgbPixel { alpha: 0, red: 0, green: 0, blue: 0 }; width*height];
 
-        return None;
+        loop {
+
+            let i_pos_x = as_u32_le(&self.bytes[offset..offset+4]) as usize;
+            offset = offset + 4;
+
+            let i_pos_y = as_u32_le(&self.bytes[offset..offset+4]) as usize;
+            offset = offset + 4;
+
+            let i_linear_offset = as_u32_le(&self.bytes[offset..offset+4]) as usize;
+            offset = offset + 4;
+
+            let i_count = as_u32_le(&self.bytes[offset..offset+4]) as usize;
+            offset = offset + 4;
+
+            if i_linear_offset == 0xFFFFFFFF && i_count == 0xFFFFFFFF {
+                break;
+            }
+
+            let block_end = offset+i_count;
+            let mut pass = 0;
+            while offset < block_end {
+                let palette_ix = self.bytes[offset] as usize;
+                let pixel = palette.palette[palette_ix];
+                let pixels_ix = (i_pos_y*width) + i_pos_x + pass;
+                pass = pass + 1;
+                pixels[pixels_ix] = pixel;
+                offset = offset + 1;
+            }
+        }
+
+        return Some(Pic { filename: self.filename.clone(), width, height, pixels });
     }
 }
