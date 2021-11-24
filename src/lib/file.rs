@@ -1,5 +1,11 @@
 use super::utils::*;
-use super::*;
+use super::glb_archive::*;
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Text {
+    pub filename: String,
+    pub text: String,
+}
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct ArgbPixel {
@@ -11,12 +17,14 @@ pub struct ArgbPixel {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Palette {
+    pub filename: String,
     pub palette:  Vec<ArgbPixel>
 }
 
 /// https://moddingwiki.shikadi.net/wiki/Raptor_PIC_Format
 #[derive(Debug, PartialEq, Clone)]
 pub struct Pic {
+    pub filename: String,
     pub width:  usize,
     pub height: usize,
     pub pixels: Vec<ArgbPixel>
@@ -24,6 +32,7 @@ pub struct Pic {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum File {
+    Text(Text),
     Palette(Palette),
     Pic(Pic),
 }
@@ -58,9 +67,14 @@ impl UntypedFile {
         UntypedFile::new(file, entry.filename.clone())
     }
 
+    pub fn get_txt(&self) -> Option<Text> {
+        return core::str::from_utf8(&self.bytes).ok()
+            .map(|s| Text { filename: self.filename.clone(), text: s.to_owned() });
+    }
+
     /// Parses VGA pallete.
     /// https://moddingwiki.shikadi.net/wiki/VGA_Palette
-    fn get_dat(&self) -> Option<Palette> {
+    pub fn get_dat(&self) -> Option<Palette> {
 
         let mut palette: Vec<ArgbPixel> = Vec::with_capacity(self.bytes.len() / 2);
 
@@ -71,13 +85,13 @@ impl UntypedFile {
             palette.push(ArgbPixel { alpha: 255, red, green, blue });
         }
 
-        Some(Palette { palette })
+        Some(Palette { filename: self.filename.clone(), palette })
     }
 
     /// Parses Raptor PIC format.
     /// https://moddingwiki.shikadi.net/wiki/Raptor_PIC_Format
     /// https://moddingwiki.shikadi.net/wiki/Raw_VGA_Image
-    fn get_pic(&self, palette: &Palette) -> Option<Pic> {
+    pub fn get_pic(&self, palette: &Palette) -> Option<Pic> {
         
         /*
         UINT32LE 	unknown1 	Always 1 when iLineCount is 0
@@ -97,7 +111,7 @@ impl UntypedFile {
         offset = offset + 4;
 
         let i_line_count = as_u32_le(&self.bytes[offset..offset+4]);
-        println!("i_line_count {}", i_line_count);
+        //println!("i_line_count {}", i_line_count);
         offset = offset + 4;
 
         let width = as_u32_le(&self.bytes[offset..offset+4]) as usize;
@@ -109,28 +123,26 @@ impl UntypedFile {
         
         let data = self.bytes[23..].to_vec();
         
-        let mut pixels: Vec<ArgbPixel> = Vec::with_capacity(data.len() / 2);
-
-        if i_line_count != 0 {
-            /*
-            0 | UINT32LE     | iPosX		    relative to left edge of image
-            4 | UINT32LE     | iPosY		    relative to top edge of image
-            8 | UINT32LE     | iLinearOffset	relative to top-left pixel
-            12 | UINT32LE     | iCount		    number of pixels to write (in that row)
-            16 | BYTE[iCount] | bPixels		    pixels to write
-            */
-
-            // TODO
-
-            unimplemented!()
-
-        } else {
+        
+        if i_line_count == 0 {
+            let mut pixels: Vec<ArgbPixel> = Vec::with_capacity(data.len() / 2);
             for palette_ix in data {
                 let palette_ix = palette_ix as usize;
                 pixels.push(palette.palette[palette_ix].clone())
             }
+            return Some(Pic { filename: self.filename.clone(), width, height, pixels });
         }
 
-        Some(Pic { width, height, pixels })
+        /*
+        0 | UINT32LE     | iPosX		    relative to left edge of image
+        4 | UINT32LE     | iPosY		    relative to top edge of image
+        8 | UINT32LE     | iLinearOffset	relative to top-left pixel
+        12 | UINT32LE     | iCount		    number of pixels to write (in that row)
+        16 | BYTE[iCount] | bPixels		    pixels to write
+        */
+
+        // TODO
+
+        return None;
     }
 }
