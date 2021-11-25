@@ -1,9 +1,10 @@
-mod glb_archive;
-mod file;
 mod bytes;
+mod file;
+mod glb_archive;
 mod utils;
 
-#[cfg(test)] mod test;
+#[cfg(test)]
+mod test;
 
+pub use file::*;
 pub use glb_archive::GlbArchive;
-pub use file::File;

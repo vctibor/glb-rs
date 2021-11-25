@@ -31,15 +31,9 @@ pub struct Pic {
     pub pixels: Vec<ArgbPixel>
 }
 
-/// https://moddingwiki.shikadi.net/wiki/Raptor_Tileset_Format
-#[derive(Debug, PartialEq, Clone)]
-pub struct Tile {
-
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct Tiles {
-    pub tiles: Vec<Tile>,
+    pub tiles: Vec<Pic>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -123,7 +117,9 @@ impl UntypedFile {
         let width = self.bytes.read_u32(&mut offset) as usize;
         let height = self.bytes.read_u32(&mut offset) as usize;
 
-        let data = self.bytes[23..].to_vec();
+        //let data = self.bytes[23..].to_vec();
+
+        let data = self.bytes[offset..].to_vec();
         
         if i_line_count == 0 {
             let mut pixels: Vec<ArgbPixel> = Vec::with_capacity(data.len() / 2);
@@ -170,8 +166,8 @@ impl UntypedFile {
         return Some(Pic { filename: self.filename.clone(), width, height, pixels });
     }
 
-    /*
-    pub fn get_tile(&self, palette: &Palette) -> Tile {
+    
+    pub fn get_tile(&self, palette: &Palette) -> Option<Pic> {
         /*
         UINT32LE 	unknown1 	? always 1?
         UINT32LE 	unknown2 	? always 0?
@@ -182,9 +178,20 @@ impl UntypedFile {
         */
 
         let mut offset: usize = 0;
+        let _unknown_1 = self.bytes.read_u32(&mut offset);
+        let _unknown_2 = self.bytes.read_u32(&mut offset);
+        let _unknown_3 = self.bytes.read_u32(&mut offset);
+        let width = self.bytes.read_u32(&mut offset) as usize;
+        let height = self.bytes.read_u32(&mut offset) as usize;
+        let data  = self.bytes[offset..].to_vec();
 
-        let _unknown_1 = as_u32_le(&self.bytes[offset..offset+4]) as usize;
-            offset = offset + 4;
+        let mut pixels: Vec<ArgbPixel> = Vec::with_capacity(data.len() / 2);
+        for palette_ix in data {
+            let palette_ix = palette_ix as usize;
+            pixels.push(palette.palette[palette_ix].clone())
+        }
+
+        return Some(Pic { filename: self.filename.clone(), width, height, pixels });
     }
-    */
+    
 }

@@ -97,7 +97,7 @@ impl<'a> GlbArchive<'a> {
 
         let mut palettes: Vec<Palette> = Vec::new();
 
-        let mut tiles: Vec<Tile> = Vec::new();
+        let mut tiles: Vec<Pic> = Vec::new();
 
         let mut currently_reading_tiles = false;
 
@@ -129,16 +129,18 @@ impl<'a> GlbArchive<'a> {
                     file_map.insert(filename.to_owned(), File::Pic(p));
                 }
             }
-            else if filename == "STARTG?TILES"
+            else if filename.starts_with("STARTG")
             {
                 currently_reading_tiles = true;
             }
             else if filename == "" && currently_reading_tiles
             {
-                // TODO: parse tile file
-                // tiles.push()
+                let pic = untyped_file.get_pic(&palettes[0]);
+                if let Some(p) = pic {
+                    tiles.push(p);
+                }
             }
-            else if filename == "ENDG?TILES"
+            else if filename.starts_with("ENDG")
             {
                 currently_reading_tiles = false;
             }
