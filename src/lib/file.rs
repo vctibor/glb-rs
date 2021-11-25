@@ -1,5 +1,6 @@
 use super::utils::*;
 use super::glb_archive::*;
+use super::bytes::Bytes;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Text {
@@ -53,14 +54,14 @@ pub enum File {
 /// Represents file that was extracted from GLB and decrypted if necessary.
 #[derive(Debug, PartialEq, Clone)]
 pub struct UntypedFile {
-    bytes: Vec<u8>,     // TODO: should use reference
+    bytes: Bytes,     // TODO: should use reference
     pub filename: String,
 }
 
 impl UntypedFile {
 
     fn new(bytes: Vec<u8>, filename: String) -> UntypedFile {
-        UntypedFile { bytes, filename }
+        UntypedFile { bytes: Bytes::from(bytes), filename }
     }
 
 
@@ -80,8 +81,8 @@ impl UntypedFile {
     }
 
     pub fn get_txt(&self) -> Option<Text> {
-        return core::str::from_utf8(&self.bytes).ok()
-            .map(|s| Text { filename: self.filename.clone(), text: s.to_owned() });
+        self.bytes.as_text()
+            .map(|s| Text { filename: self.filename.clone(), text: s.to_owned() })
     }
 
     /// Parses VGA pallete.
@@ -114,23 +115,13 @@ impl UntypedFile {
         UINT8 	    data[] 	    8bpp raw VGA data, one byte per pixel; or sprite layout blocks 
         */
 
-        let mut offset: usize = 0; 
+        let mut offset: usize = 0;
 
-        let _unknown1 = as_u32_le(&self.bytes[offset..offset+4]);
-        offset = offset + 4;
-
-        let _unknown2 = as_u32_le(&self.bytes[offset..offset+4]);
-        offset = offset + 4;
-
-        let i_line_count = as_u32_le(&self.bytes[offset..offset+4]);
-        //println!("i_line_count {}", i_line_count);
-        offset = offset + 4;
-
-        let width = as_u32_le(&self.bytes[offset..offset+4]) as usize;
-        offset = offset + 4;
-
-        let height = as_u32_le(&self.bytes[offset..offset+4]) as usize;
-        offset = offset + 4;
+        let _unknown_1 = self.bytes.read_u32(&mut offset);
+        let _unknown_2 = self.bytes.read_u32(&mut offset);
+        let i_line_count = self.bytes.read_u32(&mut offset);
+        let width = self.bytes.read_u32(&mut offset) as usize;
+        let height = self.bytes.read_u32(&mut offset) as usize;
 
         let data = self.bytes[23..].to_vec();
         
@@ -155,17 +146,10 @@ impl UntypedFile {
 
         loop {
 
-            let i_pos_x = as_u32_le(&self.bytes[offset..offset+4]) as usize;
-            offset = offset + 4;
-
-            let i_pos_y = as_u32_le(&self.bytes[offset..offset+4]) as usize;
-            offset = offset + 4;
-
-            let i_linear_offset = as_u32_le(&self.bytes[offset..offset+4]) as usize;
-            offset = offset + 4;
-
-            let i_count = as_u32_le(&self.bytes[offset..offset+4]) as usize;
-            offset = offset + 4;
+            let i_pos_x = self.bytes.read_u32(&mut offset) as usize;
+            let i_pos_y = self.bytes.read_u32(&mut offset) as usize;
+            let i_linear_offset = self.bytes.read_u32(&mut offset);
+            let i_count = self.bytes.read_u32(&mut offset) as usize;
 
             if i_linear_offset == 0xFFFFFFFF && i_count == 0xFFFFFFFF {
                 break;
@@ -185,4 +169,22 @@ impl UntypedFile {
 
         return Some(Pic { filename: self.filename.clone(), width, height, pixels });
     }
+
+    /*
+    pub fn get_tile(&self, palette: &Palette) -> Tile {
+        /*
+        UINT32LE 	unknown1 	? always 1?
+        UINT32LE 	unknown2 	? always 0?
+        UINT32LE 	unknown3 	? always 1?
+        UINT32LE 	width 	    Width of the tile, in pixels
+        UINT32LE 	height 	    Height of the tile, in pixels
+        UINT8 	    data[1024] 	8bpp raw VGA data, one byte per pixel; 
+        */
+
+        let mut offset: usize = 0;
+
+        let _unknown_1 = as_u32_le(&self.bytes[offset..offset+4]) as usize;
+            offset = offset + 4;
+    }
+    */
 }
