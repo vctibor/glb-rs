@@ -97,49 +97,58 @@ impl<'a> GlbArchive<'a> {
 
         let mut palettes: Vec<Palette> = Vec::new();
 
+        let mut tiles: Vec<Tile> = Vec::new();
+
+        let mut currently_reading_tiles = false;
+
         for entry in &fat.entries {
             let untyped_file = UntypedFile::read_file(self, entry);
-
-            /*
-            match untyped_file.filename {
-                unknown => println!("Can't parse unknown file {}!", unknown)
-            }
-            */
-
             let filename = &untyped_file.filename;
 
-            if  untyped_file.filename.ends_with("TXT")
+            if filename.ends_with("TXT")
             {
                 let text = untyped_file.get_txt();
-                //println!("{:?}", text);
                 if let Some(t) = text {
                     file_map.insert(filename.to_owned(), File::Text(t));
                 }
             }
-            else if untyped_file.filename.ends_with("_DAT")
+            else if filename.ends_with("_DAT")
             {
                 let palette = untyped_file.get_dat();
-                //println!("{:?}", palette);
                 if let Some(p) = palette {
                     file_map.insert(filename.to_owned(), File::Palette(p.clone()));
                     palettes.push(p);
                 }
             }
-            else if untyped_file.filename.ends_with("_PIC") ||
-                    untyped_file.filename.ends_with("_PIC//") ||
-                    untyped_file.filename.ends_with("_BLK")
+            else if filename.ends_with("_PIC")   ||
+                    filename.ends_with("_PIC//") ||
+                    filename.ends_with("_BLK")
             {
                 let pic = untyped_file.get_pic(&palettes[0]);
-                //println!("{:?}", palette);
                 if let Some(p) = pic {
                     file_map.insert(filename.to_owned(), File::Pic(p));
                 }
             }
+            else if filename == "STARTG?TILES"
+            {
+                currently_reading_tiles = true;
+            }
+            else if filename == "" && currently_reading_tiles
+            {
+                // TODO: parse tile file
+                // tiles.push()
+            }
+            else if filename == "ENDG?TILES"
+            {
+                currently_reading_tiles = false;
+            }
             else
             {
-                //println!("Can't parse unknown file {}!", filename);
+                println!("Can't parse unknown file {}!", filename);
             }
         }
+
+        file_map.insert("_tiles".to_owned(), File::Tiles(Tiles { tiles }));
 
         file_map
     }

@@ -30,11 +30,23 @@ pub struct Pic {
     pub pixels: Vec<ArgbPixel>
 }
 
+/// https://moddingwiki.shikadi.net/wiki/Raptor_Tileset_Format
+#[derive(Debug, PartialEq, Clone)]
+pub struct Tile {
+
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Tiles {
+    pub tiles: Vec<Tile>,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum File {
     Text(Text),
     Palette(Palette),
     Pic(Pic),
+    Tiles(Tiles),
 }
 
 
