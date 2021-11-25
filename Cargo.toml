@@ -2,6 +2,11 @@
 name = "glb-rs"
 version = "0.1.0"
 edition = "2018"
+repository = "https://github.com/vctibor/glb-rs"
+authors = ["Vladimir Ctibor <vladimir.ctibor@gmail.com>"]
+description = "Library and CLI tool to parse .GLB files used in DOS game Raptor: Call of The Shadows"
+license = "GPL-3.0-only"
+readme = "./readme.md"
 
 [[bin]]
 name = "main"
