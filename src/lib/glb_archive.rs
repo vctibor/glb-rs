@@ -95,8 +95,6 @@ impl<'a> GlbArchive<'a> {
 
         let mut file_map: HashMap<String, File> = HashMap::with_capacity(fat.entries.len());
 
-        let mut palettes: Vec<Palette> = Vec::new();
-
         let mut tiles: Vec<Pic> = Vec::new();
 
         let mut currently_reading_tiles = false;
@@ -116,18 +114,26 @@ impl<'a> GlbArchive<'a> {
             {
                 let palette = untyped_file.get_dat();
                 if let Some(p) = palette {
-                    file_map.insert(filename.to_owned(), File::Palette(p.clone()));
-                    palettes.push(p);
+                    file_map.insert(filename.to_owned(), File::Palette(p));
                 }
             }
             else if filename.ends_with("_PIC")   ||
                     filename.ends_with("_PIC//") ||
                     filename.ends_with("_BLK")
             {
-                let pic = untyped_file.get_pic(&palettes[0]);
+                let pic = untyped_file.get_pic();
                 if let Some(p) = pic {
                     file_map.insert(filename.to_owned(), File::Pic(p));
                 }
+            }
+            else if filename.ends_with("_MAP")
+            {
+                /*
+                let map = untyped_file.get_map();
+                if let Some(m) = map {
+                    file_map.insert(filename.to_owned(), File::Map(m));
+                }
+                */
             }
             else if filename.starts_with("STARTG")
             {
@@ -135,7 +141,7 @@ impl<'a> GlbArchive<'a> {
             }
             else if filename == "" && currently_reading_tiles
             {
-                let pic = untyped_file.get_pic(&palettes[0]);
+                let pic = untyped_file.get_pic();
                 if let Some(p) = pic {
                     tiles.push(p);
                 }
@@ -146,7 +152,7 @@ impl<'a> GlbArchive<'a> {
             }
             else
             {
-                println!("Can't parse unknown file {}!", filename);
+                // println!("Can't parse unknown file {}!", filename);
             }
         }
 

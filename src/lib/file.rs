@@ -2,6 +2,9 @@ use super::utils::*;
 use super::glb_archive::*;
 use super::bytes::Bytes;
 
+const LEVEL_WIDTH: usize = 9;
+const LEVEL_HEIGHT: usize = 150;
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Text {
     pub filename: String,
@@ -28,7 +31,34 @@ pub struct Pic {
     pub filename: String,
     pub width:  usize,
     pub height: usize,
-    pub pixels: Vec<ArgbPixel>
+
+    /// Indexes into palette. Palette has to be provided to get RGB values.
+    /// Option::None indicates transparent pixel.
+    pub pixels: Vec<Option<u8>>,
+}
+
+impl Pic {
+    pub fn get_argb(&self, palette: &Palette) -> Vec<ArgbPixel> {
+        let mut argb_pixels = Vec::with_capacity(self.pixels.len());
+        for pix in &self.pixels {
+            match pix {
+                None => argb_pixels.push(ArgbPixel { alpha: 0, red: 0, green: 0, blue: 0 }),
+                Some(palette_ix) => {
+                    let palette_ix = *palette_ix as usize;
+                    argb_pixels.push(palette.palette[palette_ix]);
+                }
+            }
+        }
+        argb_pixels
+    }
+}
+
+/// https://moddingwiki.shikadi.net/wiki/Raptor_Level_Format
+#[derive(Debug, PartialEq, Clone)]
+pub struct Map {
+    pub filename: String,
+    pub actor_count: u32,
+    pub tiles: [[Pic; LEVEL_WIDTH]; LEVEL_HEIGHT],
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -41,6 +71,7 @@ pub enum File {
     Text(Text),
     Palette(Palette),
     Pic(Pic),
+    Map(Map),
     Tiles(Tiles),
 }
 
@@ -98,7 +129,7 @@ impl UntypedFile {
     /// Parses Raptor PIC format.
     /// https://moddingwiki.shikadi.net/wiki/Raptor_PIC_Format
     /// https://moddingwiki.shikadi.net/wiki/Raw_VGA_Image
-    pub fn get_pic(&self, palette: &Palette) -> Option<Pic> {
+    pub fn get_pic(&self) -> Option<Pic> {
         
         /*
         UINT32LE 	unknown1 	Always 1 when iLineCount is 0
@@ -116,17 +147,9 @@ impl UntypedFile {
         let i_line_count = self.bytes.read_u32(&mut offset);
         let width = self.bytes.read_u32(&mut offset) as usize;
         let height = self.bytes.read_u32(&mut offset) as usize;
-
-        //let data = self.bytes[23..].to_vec();
-
-        let data = self.bytes[offset..].to_vec();
         
         if i_line_count == 0 {
-            let mut pixels: Vec<ArgbPixel> = Vec::with_capacity(data.len() / 2);
-            for palette_ix in data {
-                let palette_ix = palette_ix as usize;
-                pixels.push(palette.palette[palette_ix].clone())
-            }
+            let pixels: Vec<Option<u8>> = self.bytes[offset..].into_iter().map(|b| Some(*b)).collect();
             return Some(Pic { filename: self.filename.clone(), width, height, pixels });
         }
 
@@ -138,7 +161,10 @@ impl UntypedFile {
         16 | BYTE[iCount] | bPixels		    pixels to write
         */
 
-        let mut pixels: Vec<ArgbPixel> = vec![ArgbPixel { alpha: 0, red: 0, green: 0, blue: 0 }; width*height];
+
+        let data = self.bytes[offset..].to_vec();
+
+        let mut pixels: Vec<Option<u8>> = vec![None; width*height];
 
         loop {
 
@@ -154,11 +180,10 @@ impl UntypedFile {
             let block_end = offset+i_count;
             let mut pass = 0;
             while offset < block_end {
-                let palette_ix = self.bytes[offset] as usize;
-                let pixel = palette.palette[palette_ix];
+                let palette_ix = self.bytes[offset];
                 let pixels_ix = (i_pos_y*width) + i_pos_x + pass;
                 pass = pass + 1;
-                pixels[pixels_ix] = pixel;
+                pixels[pixels_ix] = Some(palette_ix);
                 offset = offset + 1;
             }
         }
@@ -167,7 +192,51 @@ impl UntypedFile {
     }
 
     
-    pub fn get_tile(&self, palette: &Palette) -> Option<Pic> {
+    pub fn get_map(&self) -> Option<Map> {
+
+        /*
+        0 | UINT32LE       | iFileSize    | size of the entire level file
+        4 | UINT32LE       | iActorOffset | always 0x1524
+        8 | UINT32LE       | iActorCount  | always (iFileSize-iActorOffset)/24
+        12 | UINT32LE[1350] | iTileData    | could also be two UINT16LE per tile     
+        */
+        
+        let filename = self.filename.clone();
+
+        let mut offset: usize = 0;
+        
+        let file_size = self.bytes.read_u32(&mut offset) as usize;
+        let _actor_offset = self.bytes.read_u32(&mut offset);
+        let actor_count = self.bytes.read_u32(&mut offset);
+        let _tile_data = self.bytes.read_u32(&mut offset);
+
+
+        //let mut tiles: [[Pic; LEVEL_WIDTH]; LEVEL_HEIGHT];
+
+
+        while offset < file_size {
+            let tile_number = self.bytes.read_u16(&mut offset);
+            let tileset_number = self.bytes.read_u16(&mut offset);
+
+            println!("{} {}", tile_number, tileset_number);
+        }
+
+        println!("");
+
+        /*
+        let map = Map {
+            filename,
+            actor_count,
+        };
+
+        Some(map)
+        */
+
+        return None;
+    }
+    
+    
+    pub fn get_tile(&self) -> Option<Pic> {
         /*
         UINT32LE 	unknown1 	? always 1?
         UINT32LE 	unknown2 	? always 0?
@@ -177,6 +246,8 @@ impl UntypedFile {
         UINT8 	    data[1024] 	8bpp raw VGA data, one byte per pixel; 
         */
 
+        let filename = self.filename.clone();
+
         let mut offset: usize = 0;
         let _unknown_1 = self.bytes.read_u32(&mut offset);
         let _unknown_2 = self.bytes.read_u32(&mut offset);
@@ -185,13 +256,12 @@ impl UntypedFile {
         let height = self.bytes.read_u32(&mut offset) as usize;
         let data  = self.bytes[offset..].to_vec();
 
-        let mut pixels: Vec<ArgbPixel> = Vec::with_capacity(data.len() / 2);
+        let mut pixels: Vec<Option<u8>> = Vec::with_capacity(data.len() / 2);
         for palette_ix in data {
-            let palette_ix = palette_ix as usize;
-            pixels.push(palette.palette[palette_ix].clone())
+            pixels.push(Some(palette_ix))
         }
 
-        return Some(Pic { filename: self.filename.clone(), width, height, pixels });
+        return Some(Pic { filename, width, height, pixels });
     }
     
 }

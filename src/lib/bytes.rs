@@ -4,20 +4,35 @@ use super::utils::as_u32_le;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Bytes {
-    bytes: Vec<u8>
+    bytes: Vec<u8>,
 }
 
 impl Bytes {
+    pub fn from(bytes: Vec<u8>) -> Bytes {
+        Bytes { bytes }
+    }
 
-    pub fn from(bytes: Vec<u8>) -> Bytes { Bytes { bytes } }
-
-    pub fn len(&self) -> usize { self.bytes.len() }
+    pub fn len(&self) -> usize {
+        self.bytes.len()
+    }
 
     /// Reads unsigned 32bit little endian integer and iterates offset by 4.
     pub fn read_u32(&self, offset: &mut usize) -> u32 {
-        let number_bytes = &self.bytes[*offset..*offset+4];
+        let array = [
+            self.bytes[*offset],
+            self.bytes[*offset+1],
+            self.bytes[*offset+2],
+            self.bytes[*offset+3]
+        ];
         *offset = *offset + 4;
-        as_u32_le(number_bytes)
+        u32::from_le_bytes(array)
+    }
+
+    /// Reads unsigned 16bit little endian integer and iterates offset by 2.
+    pub fn read_u16(&self, offset: &mut usize) -> u16 {
+        let array: [u8; 2] = [self.bytes[*offset], self.bytes[*offset + 1]];
+        *offset = *offset + 2;
+        u16::from_le_bytes(array)
     }
 
     pub fn as_text(&self) -> Option<&str> {
