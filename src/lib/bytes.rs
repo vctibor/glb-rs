@@ -1,7 +1,5 @@
 use std::ops::{Index, RangeFrom};
 
-use super::utils::as_u32_le;
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct Bytes {
     bytes: Vec<u8>,

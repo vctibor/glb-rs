@@ -1,4 +1,6 @@
 
+use crate::extracted::Extracted;
+
 use super::utils::*;
 use super::file::*;
 
@@ -91,9 +93,9 @@ impl<'a> GlbArchive<'a> {
         FileAllocationTable { entries }
     }
 
-    pub fn extract_files(&self, fat: &FileAllocationTable) -> HashMap<String, File> {
+    pub fn extract_files(&self, fat: &FileAllocationTable) -> Extracted {
 
-        let mut file_map: HashMap<String, File> = HashMap::with_capacity(fat.entries.len());
+        let mut named_files: HashMap<String, File> = HashMap::with_capacity(fat.entries.len());
 
         let mut tiles: Vec<Pic> = Vec::new();
 
@@ -107,14 +109,14 @@ impl<'a> GlbArchive<'a> {
             {
                 let text = untyped_file.get_txt();
                 if let Some(t) = text {
-                    file_map.insert(filename.to_owned(), File::Text(t));
+                    named_files.insert(filename.to_owned(), File::Text(t));
                 }
             }
             else if filename.ends_with("_DAT")
             {
                 let palette = untyped_file.get_dat();
                 if let Some(p) = palette {
-                    file_map.insert(filename.to_owned(), File::Palette(p));
+                    named_files.insert(filename.to_owned(), File::Palette(p));
                 }
             }
             else if filename.ends_with("_PIC")   ||
@@ -123,17 +125,15 @@ impl<'a> GlbArchive<'a> {
             {
                 let pic = untyped_file.get_pic();
                 if let Some(p) = pic {
-                    file_map.insert(filename.to_owned(), File::Pic(p));
+                    named_files.insert(filename.to_owned(), File::Pic(p));
                 }
             }
             else if filename.ends_with("_MAP")
             {
-                /*
                 let map = untyped_file.get_map();
                 if let Some(m) = map {
-                    file_map.insert(filename.to_owned(), File::Map(m));
+                    named_files.insert(filename.to_owned(), File::Map(m));
                 }
-                */
             }
             else if filename.starts_with("STARTG")
             {
@@ -156,8 +156,7 @@ impl<'a> GlbArchive<'a> {
             }
         }
 
-        file_map.insert("_tiles".to_owned(), File::Tiles(Tiles { tiles }));
-
-        file_map
+        let tiles = Tiles { tiles };
+        Extracted { named_files, tiles }
     }
 }

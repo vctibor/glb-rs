@@ -1,9 +1,11 @@
+use image::{ImageBuffer, RgbaImage, Rgba};
+
 use super::utils::*;
 use super::glb_archive::*;
 use super::bytes::Bytes;
 
-const LEVEL_WIDTH: usize = 9;
-const LEVEL_HEIGHT: usize = 150;
+const MAP_WIDTH: usize = 9;
+const MAP_HEIGHT: usize = 150;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Text {
@@ -51,14 +53,43 @@ impl Pic {
         }
         argb_pixels
     }
+
+    pub fn to_imagebuffer(&self, palette: &Palette) -> RgbaImage {
+        let width = self.width as u32;
+        let height = self.height as u32;
+
+        let mut pixels = self.get_argb(palette).into_iter();
+
+        let mut img: RgbaImage = ImageBuffer::new(width, height);
+
+        for y in 0..height {
+            for x in 0..width {
+                if let Some(pixel) = pixels.next() {
+                    let r = pixel.red;
+                    let g = pixel.green;
+                    let b = pixel.blue;
+                    let a = pixel.alpha;
+                    img.put_pixel(x, y, Rgba([r, g, b, a]));
+                }
+            }
+        }
+
+        img
+    }
 }
 
 /// https://moddingwiki.shikadi.net/wiki/Raptor_Level_Format
 #[derive(Debug, PartialEq, Clone)]
 pub struct Map {
     pub filename: String,
+
+    pub width: usize,
+    pub height: usize,
+
     pub actor_count: u32,
-    pub tiles: [[Pic; LEVEL_WIDTH]; LEVEL_HEIGHT],
+
+    /// Index into tileset
+    pub tiles: [[u16; MAP_WIDTH]; MAP_HEIGHT],
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -161,9 +192,6 @@ impl UntypedFile {
         16 | BYTE[iCount] | bPixels		    pixels to write
         */
 
-
-        let data = self.bytes[offset..].to_vec();
-
         let mut pixels: Vec<Option<u8>> = vec![None; width*height];
 
         loop {
@@ -205,34 +233,52 @@ impl UntypedFile {
 
         let mut offset: usize = 0;
         
-        let file_size = self.bytes.read_u32(&mut offset) as usize;
+        let _file_size = self.bytes.read_u32(&mut offset) as usize;
         let _actor_offset = self.bytes.read_u32(&mut offset);
         let actor_count = self.bytes.read_u32(&mut offset);
         let _tile_data = self.bytes.read_u32(&mut offset);
 
 
-        //let mut tiles: [[Pic; LEVEL_WIDTH]; LEVEL_HEIGHT];
+        let mut tiles: [[u16; MAP_WIDTH]; MAP_HEIGHT] = [[0; MAP_WIDTH]; MAP_HEIGHT];
 
 
+        for y in 0..MAP_HEIGHT {
+            for x in 0..MAP_WIDTH {
+
+                // let index = (y * LEVEL_HEIGHT) + x;
+
+                let tile_number = self.bytes.read_u16(&mut offset);
+                let _tileset_number = self.bytes.read_u16(&mut offset);
+
+                //print!("[{},{}]", tile_number, tileset_number);
+
+                tiles[y][x] = tile_number;
+            }
+
+            //println!("");
+        }
+
+        /*
         while offset < file_size {
             let tile_number = self.bytes.read_u16(&mut offset);
             let tileset_number = self.bytes.read_u16(&mut offset);
 
-            println!("{} {}", tile_number, tileset_number);
+            print!("[{},{}]", tile_number, tileset_number);
         }
+        */
 
-        println!("");
+        //println!("{:?}", tiles);
 
-        /*
+        
         let map = Map {
+            width: MAP_WIDTH,
+            height: MAP_HEIGHT,
             filename,
             actor_count,
+            tiles,
         };
 
         Some(map)
-        */
-
-        return None;
     }
     
     

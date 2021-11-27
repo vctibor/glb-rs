@@ -1,45 +1,50 @@
 use std::io::Write;
 
 use glb_rs::*;
-use image::{ImageBuffer, Rgba, RgbaImage, imageops::{self}};
-use image::imageops::FilterType;
-use image::imageops::resize;
+use image::imageops::overlay;
+use image::{ImageBuffer, Rgba, RgbaImage};
 
 const EXPORT_FOLDER: &'static str = "./export";
 
 pub fn main() {
+    /*
+    let bytes = std::fs::read("test_files/FILE0001.GLB").unwrap();
+    let archive = GlbArchive::new(&bytes);
+    let fat = archive.parse_fat();
+    let files = archive.extract_files(&fat);
+    */
 
     let _ = std::fs::remove_dir_all(EXPORT_FOLDER);
     let _ = std::fs::create_dir_all(EXPORT_FOLDER);
-    
+
     let palette = {
-            
         let bytes = std::fs::read("test_files/FILE0001.GLB").unwrap();
         let archive = GlbArchive::new(&bytes);
         let fat = archive.parse_fat();
         let files = archive.extract_files(&fat);
 
-        let palette = files.get("PALETTE_DAT").unwrap().clone();
-        
-        let palette = match palette {
-            File::Palette(p) => p,
-            _ => panic!("PALETTE_DAT has to be palette!")
-        };
+        let palette = files.named_files.get("PALETTE_DAT").unwrap().clone();
 
-        palette
+        match palette {
+            File::Palette(p) => p,
+            _ => panic!("PALETTE_DAT has to be palette!"),
+        }
     };
 
-    let bytes = std::fs::read("test_files/FILE0003.GLB").unwrap();
+    let bytes = std::fs::read("test_files/FILE0004.GLB").unwrap();
     let archive = GlbArchive::new(&bytes);
     let fat = archive.parse_fat();
-    let files = archive.extract_files(&fat);
+    let extracted = archive.extract_files(&fat);
 
-    for file in files.values() {
+    let tiles = extracted.tiles;
+
+    for file in extracted.named_files.values() {
         match file {
             File::Map(m) => {
-                //println!("{} {}", m.filename, m.actor_count);
+                save_map(&m, &tiles, &palette);
             }
-            
+
+            /*
             File::Text(t) => {
                 let export_path = format!("{}/{}.txt", EXPORT_FOLDER, t.filename);
                 save_text(t, &export_path);
@@ -49,45 +54,58 @@ pub fn main() {
                 save_pic(p, &palette, &export_path);
             }
             File::Tiles(t) => {
-                save_tiles(t);
+                save_tiles(t, &palette);
             }
-            
+            */
             _ => {}
         }
     }
 }
 
-fn save_tiles(t: &Tiles) {
+fn save_map(m: &Map, tiles: &Tiles, palette: &Palette) {
+    let tile_width = 32;
+    let tile_height = 32;
+
+    let image_width = m.width as u32 * tile_width;
+    let image_height = m.height as u32 * tile_height;
+
+    let mut img: RgbaImage = ImageBuffer::new(image_width, image_height);
+
+    for y in 0..m.height {
+        for x in 0..m.width {
+            let tile_ix = m.tiles[y][x] as usize;
+
+            if tile_ix >= tiles.tiles.len() {
+                continue;
+            }
+
+            let tile = tiles.tiles[tile_ix].clone();
+
+            let on_top = tile.to_imagebuffer(palette);
+
+            let image_x = x as u32 * tile_width;
+            let image_y = y as u32 * tile_width;
+
+            overlay(&mut img, &on_top, image_x, image_y);
+        }
+    }
+
+    let path = format!("{}/{}.png", EXPORT_FOLDER, m.filename);
+    let _ = img.save(path);
+}
+
+fn save_tiles(t: &Tiles, palette: &Palette) {
     let mut ix = 0;
     for tile in &t.tiles {
         let path = format!("{}/_tile{}.png", EXPORT_FOLDER, ix);
         ix = ix + 1;
-        //save_pic(tile, &path);
+        save_pic(tile, palette, &path);
     }
 }
 
 fn save_pic(p: &Pic, palette: &Palette, export_path: &str) {
-    let width = p.width as u32;
-    let height = p.height as u32;
-
-    let mut pixels = p.get_argb(palette).into_iter();
-
-    let mut img: RgbaImage = ImageBuffer::new(width, height);
-
-    for y in 0..height {
-        for x in 0..width {
-            if let Some(pixel) = pixels.next() {
-                let r = pixel.red;
-                let g = pixel.green;
-                let b = pixel.blue;
-                let a = pixel.alpha;
-                img.put_pixel(x, y, Rgba([r, g, b, a]));
-            }
-        }
-    }
-    
-    let img = resize(&img, width*4, height*4, FilterType::CatmullRom);
-
+    let img = p.to_imagebuffer(palette);
+    //let img = resize(&img, width*4, height*4, FilterType::Nearest);
     let _ = img.save(export_path);
 }
 
