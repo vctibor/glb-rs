@@ -1,26 +1,41 @@
 use std::io::Write;
+use std::time::Instant;
 
 use glb_rs::*;
 use image::imageops::overlay;
-use image::{ImageBuffer, Rgba, RgbaImage};
+use image::{ImageBuffer, RgbaImage};
 
 const EXPORT_FOLDER: &'static str = "./export";
 
 pub fn main() {
-    
-    let bytes = std::fs::read("test_files/FILE0001.GLB").unwrap();
-    let archive = GlbArchive::new(&bytes);
-    let fat = archive.parse_fat();
-    let files = archive.extract_files(&fat);
-    
 
-    /*
+
+    //export();
+    measure();
+}
+
+fn measure() {
+
+    for _ in 0..10 {
+        let now = Instant::now();
+
+        let mut archive = GlbArchive::from_file("test_files/FILE0001.GLB").unwrap();
+        let fat = archive.parse_fat();
+        let files = archive.extract_files(&fat);
+
+        let elapsed = now.elapsed();
+        println!("Elapsed: {:.2?}", elapsed);
+    }
+}
+
+fn export() {
+    let now = Instant::now();
+
     let _ = std::fs::remove_dir_all(EXPORT_FOLDER);
     let _ = std::fs::create_dir_all(EXPORT_FOLDER);
 
     let palette = {
-        let bytes = std::fs::read("test_files/FILE0001.GLB").unwrap();
-        let archive = GlbArchive::new(&bytes);
+        let mut archive =  GlbArchive::from_file("test_files/FILE0001.GLB").unwrap();
         let fat = archive.parse_fat();
         let files = archive.extract_files(&fat);
 
@@ -32,8 +47,7 @@ pub fn main() {
         }
     };
 
-    let bytes = std::fs::read("test_files/FILE0001.GLB").unwrap();
-    let archive = GlbArchive::new(&bytes);
+    let mut archive = GlbArchive::from_file("test_files/FILE0001.GLB").unwrap();
     let fat = archive.parse_fat();
     let extracted = archive.extract_files(&fat);
 
@@ -59,7 +73,9 @@ pub fn main() {
             _ => {}
         }
     }
-    */
+
+    let elapsed = now.elapsed();
+    println!("Elapsed: {:.2?}", elapsed);
 }
 
 fn save_map(m: &Map, tiles: &Tiles, palette: &Palette) {

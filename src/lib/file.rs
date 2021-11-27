@@ -1,6 +1,5 @@
 use image::{ImageBuffer, RgbaImage, Rgba};
 
-use super::utils::*;
 use super::glb_archive::*;
 use super::bytes::Bytes;
 
@@ -108,32 +107,32 @@ pub enum File {
 
 
 /// Represents file that was extracted from GLB and decrypted if necessary.
-#[derive(Debug, PartialEq, Clone)]
-pub struct UntypedFile {
-    bytes: Bytes,     // TODO: should use reference
+#[derive(Debug, PartialEq)]
+pub struct UntypedFile<'a> {
+    bytes: Bytes<'a>,
     pub filename: String,
 }
 
-impl UntypedFile {
-
-    fn new(bytes: Vec<u8>, filename: String) -> UntypedFile {
-        UntypedFile { bytes: Bytes::from(bytes), filename }
-    }
-
+impl<'a> UntypedFile<'a> {
 
     /// Copy bytes representing single file from slice into new vector.
     /// If the file is encrypted, this function performs decryption.
-    pub fn read_file(archive: &GlbArchive, entry: &FatEntry) -> UntypedFile {
+    pub fn read_file(archive: &'a mut GlbArchive, entry: &FatEntry) -> UntypedFile<'a> {
+
+        let filename = entry.filename.clone();
+
         let length = entry.length as usize;
-        let offset = entry.offset as usize;
-        let mut file: Vec<u8> = Vec::with_capacity(length);
-        for ix in offset..offset+length {
-            file.push(archive.bytes[ix]);
-        }
+        let start_offset = entry.offset as usize;
+        let end_offset = start_offset + length;
+
+        let bytes = &mut archive.bytes[start_offset..end_offset];
+        let mut bytes = Bytes::from(bytes);
+
         if entry.flag == Flag::Encrypted {
-            file = decrypt(&file, ENCRYPTION_KEY);
+            bytes.decrypt(ENCRYPTION_KEY);
         }
-        UntypedFile::new(file, entry.filename.clone())
+
+        UntypedFile { bytes, filename }
     }
 
     pub fn get_txt(&self) -> Option<Text> {
@@ -161,6 +160,8 @@ impl UntypedFile {
     /// https://moddingwiki.shikadi.net/wiki/Raptor_PIC_Format
     /// https://moddingwiki.shikadi.net/wiki/Raw_VGA_Image
     pub fn get_pic(&self) -> Option<Pic> {
+
+        let filename = self.filename.clone();
         
         /*
         UINT32LE 	unknown1 	Always 1 when iLineCount is 0
@@ -216,7 +217,7 @@ impl UntypedFile {
             }
         }
 
-        return Some(Pic { filename: self.filename.clone(), width, height, pixels });
+        return Some(Pic { filename, width, height, pixels });
     }
 
     
@@ -243,24 +244,8 @@ impl UntypedFile {
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
 
-                // let index = (y * LEVEL_HEIGHT) + x;
-
                 let tile_number = self.bytes.read_u16(&mut offset);
                 let _tileset_number = self.bytes.read_u16(&mut offset);
-
-                //print!("[{},{}]", tile_number, tileset_number);
-
-                /*
-                let mut image_x = (x as u32 + 1) * tile_size;
-                let mut image_y = y as u32 * tile_size;
-
-                if x == m.width - 1 {
-                    image_x = 0;
-
-                    image_y = image_y + tile_size;
-                }
-
-                */
 
                 let mut x = x + 1;
                 let mut y = y;
@@ -275,22 +260,8 @@ impl UntypedFile {
 
                 tiles[y][x] = tile_number;
             }
-
-            //println!("");
         }
 
-        /*
-        while offset < file_size {
-            let tile_number = self.bytes.read_u16(&mut offset);
-            let tileset_number = self.bytes.read_u16(&mut offset);
-
-            print!("[{},{}]", tile_number, tileset_number);
-        }
-        */
-
-        //println!("{:?}", tiles);
-
-        
         let map = Map {
             width: MAP_WIDTH,
             height: MAP_HEIGHT,

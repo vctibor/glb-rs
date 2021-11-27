@@ -1,13 +1,10 @@
-
-use crate::extracted::Extracted;
-
-use super::utils::*;
+use super::bytes::Bytes;
+use super::extracted::Extracted;
 use super::file::*;
 
 use std::collections::HashMap;
 
 pub const ENCRYPTION_KEY: &[u8; 8] = b"32768GLB";
-
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Flag {
@@ -29,71 +26,78 @@ pub struct FileAllocationTable {
 }
 
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct GlbArchive<'a> {
-    pub bytes: &'a [u8]
+#[derive(Debug, PartialEq)]
+pub struct GlbArchive {
+    pub bytes: Vec<u8>
 }
 
 
-impl<'a> GlbArchive<'a> {
+// The game only decrypts one FAT entry at a time, so after 28 bytes
+// the key and "previous byte read" must be set back to the initial state.
+const CHUNK_SIZE: usize = 28;
 
-    pub fn new(bytes: &'a [u8]) -> GlbArchive<'a> {
-        GlbArchive { bytes }
+
+// If given first 28 bytes of file it parses them as header,
+// that means that offset field is interpreted as number of files,
+// which is value returned, and other fields are ignored.
+fn parse_header(encrypted_bytes: &mut [u8]) -> usize {
+    let entry = parse_fat_entry(encrypted_bytes);
+    entry.offset as usize
+}
+
+// Parses single 28 byte File Allocation Table entry.
+fn parse_fat_entry(encrypted_bytes: &mut [u8]) -> FatEntry {
+
+    if encrypted_bytes.len() != CHUNK_SIZE {
+        // TODO: Instead of panics we should return Result
+        panic!("You should decrypt by chunks of 28 bytes.");
     }
 
-    pub fn parse_fat(&self) -> FileAllocationTable {
+    let mut decrypted_bytes = Bytes::from(encrypted_bytes);
+    decrypted_bytes.decrypt(ENCRYPTION_KEY);
 
-        // The game only decrypts one FAT entry at a time, so after 28 bytes
-        // the key and "previous byte read" must be set back to the initial state.
-        const CHUNK_SIZE: usize = 28;
+    let mut offset: usize = 0;
 
-        // Parses single 28 byte File Allocation Table entry.
-        fn parse_fat_entry(encrypted_bytes: &[u8]) -> FatEntry {
+    let flag = match decrypted_bytes.read_u32(&mut offset) {
+        0 => Flag::Normal,
+        1 => Flag::Encrypted,
+        other => panic!("Unknown flag {}", other)
+    };
 
-            if encrypted_bytes.len() != CHUNK_SIZE {
-                panic!("You should decrypt by chunks of 28 bytes.");
-            }
+    let file_offset = decrypted_bytes.read_u32(&mut offset);
 
-            let decrypted_bytes = decrypt(encrypted_bytes, ENCRYPTION_KEY);
+    let length = decrypted_bytes.read_u32(&mut offset);
 
-            let flag = match as_u32_le(&decrypted_bytes[0..4]) {
-                0 => Flag::Normal,
-                1 => Flag::Encrypted,
-                other => panic!("Unknown flag {}", other)
-            };
+    let filename = decrypted_bytes[12..28].split(|b| *b == 0).into_iter().next().unwrap();
+    let filename = core::str::from_utf8(filename).unwrap().to_string();
 
-            let offset = as_u32_le(&decrypted_bytes[4..8]);
+    FatEntry { flag, offset: file_offset, length, filename }
+}
 
-            let length = as_u32_le(&decrypted_bytes[8..12]);
+impl GlbArchive {
 
-            let filename = decrypted_bytes[12..28].split(|b| *b == 0).into_iter().next().unwrap();
-            let filename = core::str::from_utf8(filename).unwrap().to_string();
+    pub fn from_file(path: &str) -> Option<GlbArchive> {
+        std::fs::read(path).ok().map(|bytes|
+            GlbArchive { bytes }
+        )
+    }
 
-            FatEntry { flag, offset, length, filename }
-        }
-
-        // If given first 28 bytes of file it parses them as header,
-        // that means that offset field is interpreted as number of files,
-        // which is value returned, and other fields are ignored.
-        fn parse_header(encrypted_bytes: &[u8]) -> usize {
-            let entry = parse_fat_entry(encrypted_bytes);
-            entry.offset as usize
-        }
+    pub fn parse_fat(&mut self) -> FileAllocationTable {
 
         let mut offset: usize = 0;
-        let fat_entries_count = parse_header(&self.bytes[offset..offset+CHUNK_SIZE]);
+        let fat_entries_count = parse_header(&mut self.bytes[offset..offset+CHUNK_SIZE]);
         let mut entries = Vec::with_capacity(fat_entries_count);
 
         for _ in 0..fat_entries_count {
             offset = offset + CHUNK_SIZE;
-            let entry = parse_fat_entry(&self.bytes[offset..offset+CHUNK_SIZE]);
+            let entry = parse_fat_entry(&mut self.bytes[offset..offset+CHUNK_SIZE]);
             entries.push(entry);
         }
 
         FileAllocationTable { entries }
     }
 
-    pub fn extract_files(&self, fat: &FileAllocationTable) -> Extracted {
+    pub fn extract_files(&mut self, fat: &FileAllocationTable) -> Extracted {
 
         let mut named_files: HashMap<String, File> = HashMap::with_capacity(fat.entries.len());
 
