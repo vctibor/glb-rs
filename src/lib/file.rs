@@ -238,9 +238,7 @@ impl UntypedFile {
         let actor_count = self.bytes.read_u32(&mut offset);
         let _tile_data = self.bytes.read_u32(&mut offset);
 
-
         let mut tiles: [[u16; MAP_WIDTH]; MAP_HEIGHT] = [[0; MAP_WIDTH]; MAP_HEIGHT];
-
 
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
@@ -251,6 +249,29 @@ impl UntypedFile {
                 let _tileset_number = self.bytes.read_u16(&mut offset);
 
                 //print!("[{},{}]", tile_number, tileset_number);
+
+                /*
+                let mut image_x = (x as u32 + 1) * tile_size;
+                let mut image_y = y as u32 * tile_size;
+
+                if x == m.width - 1 {
+                    image_x = 0;
+
+                    image_y = image_y + tile_size;
+                }
+
+                */
+
+                let mut x = x + 1;
+                let mut y = y;
+
+                if x == MAP_WIDTH {
+                    x = 0;
+
+                    if y < MAP_HEIGHT-1 {
+                        y = y + 1;
+                    }
+                }
 
                 tiles[y][x] = tile_number;
             }

@@ -7,13 +7,14 @@ use image::{ImageBuffer, Rgba, RgbaImage};
 const EXPORT_FOLDER: &'static str = "./export";
 
 pub fn main() {
-    /*
+    
     let bytes = std::fs::read("test_files/FILE0001.GLB").unwrap();
     let archive = GlbArchive::new(&bytes);
     let fat = archive.parse_fat();
     let files = archive.extract_files(&fat);
-    */
+    
 
+    /*
     let _ = std::fs::remove_dir_all(EXPORT_FOLDER);
     let _ = std::fs::create_dir_all(EXPORT_FOLDER);
 
@@ -31,7 +32,7 @@ pub fn main() {
         }
     };
 
-    let bytes = std::fs::read("test_files/FILE0004.GLB").unwrap();
+    let bytes = std::fs::read("test_files/FILE0001.GLB").unwrap();
     let archive = GlbArchive::new(&bytes);
     let fat = archive.parse_fat();
     let extracted = archive.extract_files(&fat);
@@ -44,7 +45,6 @@ pub fn main() {
                 save_map(&m, &tiles, &palette);
             }
 
-            /*
             File::Text(t) => {
                 let export_path = format!("{}/{}.txt", EXPORT_FOLDER, t.filename);
                 save_text(t, &export_path);
@@ -56,23 +56,23 @@ pub fn main() {
             File::Tiles(t) => {
                 save_tiles(t, &palette);
             }
-            */
             _ => {}
         }
     }
+    */
 }
 
 fn save_map(m: &Map, tiles: &Tiles, palette: &Palette) {
-    let tile_width = 32;
-    let tile_height = 32;
+    let tile_size = 32;
 
-    let image_width = m.width as u32 * tile_width;
-    let image_height = m.height as u32 * tile_height;
+    let image_width = m.width as u32 * tile_size;
+    let image_height = m.height as u32 * tile_size;
 
     let mut img: RgbaImage = ImageBuffer::new(image_width, image_height);
 
     for y in 0..m.height {
         for x in 0..m.width {
+
             let tile_ix = m.tiles[y][x] as usize;
 
             if tile_ix >= tiles.tiles.len() {
@@ -83,9 +83,23 @@ fn save_map(m: &Map, tiles: &Tiles, palette: &Palette) {
 
             let on_top = tile.to_imagebuffer(palette);
 
-            let image_x = x as u32 * tile_width;
-            let image_y = y as u32 * tile_width;
 
+            
+                
+            let image_x = x as u32 * tile_size;
+            let image_y = y as u32 * tile_size;
+
+            /*
+            let mut image_x = (x as u32 + 1) * tile_size;
+            let mut image_y = y as u32 * tile_size;
+
+            if x == m.width - 1 {
+                image_x = 0;
+
+                image_y = image_y + tile_size;
+            }
+            */
+            
             overlay(&mut img, &on_top, image_x, image_y);
         }
     }
